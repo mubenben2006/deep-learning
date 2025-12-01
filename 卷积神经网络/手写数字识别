@@ -1,0 +1,65 @@
+import torch.nn as nn
+import torch
+import torchvision
+from torch.utils.data import DataLoader
+import cv2
+
+epoch=10
+batch_size=20
+lr=0.03
+download_mnist=True
+#%%
+trans=torchvision.transforms.Compose(
+    [torchvision.transforms.ToTensor(),
+     torchvision.transforms.Normalize([0.5],[0.5])
+    ]
+)
+
+train_data=torchvision.datasets.MNIST(root='./data',train=True,transform=trans,download=download_mnist)
+train_loader=DataLoader(train_data,batch_size=batch_size,shuffle=True)
+test_data=torchvision.datasets.MNIST(root='./data',train=False,transform=trans,download=download_mnist)
+test_loader=DataLoader(test_data,batch_size=len(test_data),shuffle=True)
+#%%
+#实现单张图片可视化
+images,labels=next(iter(train_loader))
+img=torchvision.utils.make_grid(images)
+img=img.numpy().transpose(1,2,0)
+std=[0.5,0.5,0.5]
+mean=[0.5,0.5,0.5]
+img=img*std+mean
+print(labels)
+cv2.imshow('win',img)
+key_pressed=cv2.waitKey(0)
+#%%
+net=torch.nn.Sequential(
+    nn.Linear(28*28,256),
+    nn.ReLU(),
+    nn.Linear(256,128),
+    nn.ReLU(),
+    nn.Linear(128,10)
+)
+
+loss_func=nn.CrossEntropyLoss()
+optimizer=torch.optim.SGD(net.parameters(),lr=lr)
+#%%
+print("start training")
+for epoch in range(epoch):
+    for data in train_loader:
+        img,label=data
+        img=img.view(img.size(0),-1)
+        out=net(img)
+        loss=loss_func(out,label)
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+    num_correct=0
+    for data in test_loader:
+        img,label=data
+        img=img.view(img.size(0),-1)
+        out=net(img)
+        _,pred=torch.max(out,1)
+        num_correct += torch.sum(pred==label).item()
+
+    acc=num_correct/len(test_data)
+    print("第%d次迭代，测试集准确率为%f"%(epoch+1,acc))
